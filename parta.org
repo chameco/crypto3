@@ -1,0 +1,50 @@
+#+title: Cryptography - Homework 3a
+#+author: Samuel Breese
+#+options: toc:nil
+
+#+latex_header_extra: \usepackage{mdframed}
+#+latex_header_extra: \BeforeBeginEnvironment{minted}{\begin{mdframed}}
+#+latex_header_extra: \AfterEndEnvironment{minted}{\end{mdframed}}
+
+* Problem
+Implement Blum-Goldwasser probabilistic encryption algorithm with the following setup parameters
+
+\begin{equation*}
+p = 499,\,q = 547,\,a = -57,\,b = 52,\,X_0 = 159201
+\end{equation*}
+
+The message $m$ to be encrypted in binary is $10011100000100001100$.
+* What is the ciphertext?
+We must know the modulus and public key $N = pq = 499 \times 547 = 272953$.
+Using our seed $X_0$, we must generate the least-significant bits of $X_1$ through $X_{19}$ (since our message $m$ is 19 bits long) use the Blum Blum Shub pseudo-random number generator.
+The following Haskell code does this:
+
+#+begin_src haskell
+  data Natural = Succ Natural | Zero
+
+  bbs :: Integer -> Integer -> [Integer]
+  bbs x0 modulus = lsb . x <$> iterate Succ Zero
+    where lsb :: Integer -> Integer
+          lsb = flip rem 2
+          x :: Natural -> Integer
+          x Zero = x0
+          x (Succ n) = let xn = x n in rem (xn * xn) modulus
+#+end_src
+
+Evaluating =take 20 $ bbs 159201 272953= yields\\
+=[1,1,0,1,0,0,0,1,0,0,0,0,0,0,1,1,0,1,0,0]=, which we can XOR with the message (as usual in a stream cipher) to obtain the encrypted message:
+
+\begin{equation*}
+C(m) = 10011100000100001100 \oplus 11010001000000110100 = 01001101000100111000
+\end{equation*}
+
+We must also include $X_20 = X_0^{2^{20}} = 36858$ in the message.
+* Verify your answer by showing that $D(C(m)) = m$
+To decrypt, we first compute $r_p = X_{20}^{\left(\frac{p+1}{4}\right)^{20}}\mathrm{mod}\ p$ and $r_q = X_{20}^{\left(\frac{q+1}{4}\right)^{20}}\mathrm{mod}\ q$, obtaining $r_p = 20$ and $r_q = 24$.
+From these, we can re-compute the seed:
+
+\begin{equation*}
+X_0 = q \times b \times r_p + p \times a \times r_q\ \mathrm{mod}\ N = 159201
+\end{equation*}
+
+Since this matches the original $X_0$, we can re-generate the stream of bits used to encrypt the message, and XOR those bits with the ciphertext to obtain the plaintext.
